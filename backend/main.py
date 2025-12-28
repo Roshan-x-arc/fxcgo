@@ -157,6 +157,6 @@ def forecast_15_days():
         "best_trade_day": {
             "date": dates[best_index],
             "price": round(future_prices[best_index], 2),
-            "reason": "Mid-range equilibrium (minimum importer/exporter loss)"
+            "reason": "Recommended Price for minimum loss"
         }
     }

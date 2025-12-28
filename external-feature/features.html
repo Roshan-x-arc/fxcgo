@@ -156,10 +156,22 @@
             <h1 class="page-title" id="pageTitle">Forward Contracts</h1>
           </div>
           <div class="header-right">
-            <a href="../index.html" class="btn-secondary" style="text-decoration: none; padding: 8px 16px;">
+            <a
+              href="../index.html"
+              class="btn-secondary"
+              style="text-decoration: none; padding: 8px 16px"
+            >
               Back to Home
             </a>
-            <a href="../index.html" class="btn-primary" style="text-decoration: none; padding: 8px 16px; margin-left: 10px;">
+            <a
+              href="../index.html"
+              class="btn-primary"
+              style="
+                text-decoration: none;
+                padding: 8px 16px;
+                margin-left: 10px;
+              "
+            >
               Get Started
             </a>
           </div>
@@ -168,17 +180,14 @@
         <!-- Dashboard Content -->
         <main class="dashboard-content">
           <!-- Forward Contracts Section -->
-          <div
-            class="content-section active"
-            id="contractsSection"
-          >
+          <div class="content-section active" id="contractsSection">
             <div class="forward-contract-container">
               <header class="forward-contract-hero">
                 <div class="forward-contract-hero-icon">💱</div>
                 <h2>Forward Contract Note Generator</h2>
                 <p class="forward-contract-subheadline">
-                  Analyze FX trends and volatility using AI-powered forecasting to determine
-                  the optimal time to lock a forward contract.
+                  Analyze FX trends and volatility using AI-powered forecasting
+                  to determine the optimal time to lock a forward contract.
                 </p>
               </header>
 
@@ -192,7 +201,7 @@
                       <div class="forward-contract-form-group">
                         <label for="forwardContractAmount">
                           <span class="forward-contract-label-icon">💰</span>
-                          Amount
+                          Amount in USD
                         </label>
                         <input
                           type="number"
@@ -230,7 +239,7 @@
                     </div>
 
                     <button type="submit" class="forward-contract-generate-btn">
-                      <span>Generate Forward Contract Note</span>
+                      <span>Know the best optimal date</span>
                       <span class="forward-contract-btn-arrow">→</span>
                     </button>
                   </form>
@@ -505,16 +514,37 @@
             id="marketplaceSection"
             style="display: none"
           >
-            <div class="marketplace-header-section" style="padding: 2rem; background: white; border-radius: 12px; margin-bottom: 2rem;">
+            <div
+              class="marketplace-header-section"
+              style="
+                padding: 2rem;
+                background: white;
+                border-radius: 12px;
+                margin-bottom: 2rem;
+              "
+            >
               <h2>Marketplace</h2>
               <p>Explore products from verified exporters worldwide</p>
-              <a href="../marketplace/marketplace.html" target="_blank" class="btn-primary" style="margin-top: 1rem; display: inline-block; text-decoration: none;">
+              <a
+                href="../marketplace/marketplace.html"
+                target="_blank"
+                class="btn-primary"
+                style="
+                  margin-top: 1rem;
+                  display: inline-block;
+                  text-decoration: none;
+                "
+              >
                 Go to Full Marketplace →
               </a>
             </div>
-            <div id="marketplacePreview" style="padding: 2rem; background: white; border-radius: 12px;">
-              <p style="text-align: center; color: #666; padding: 3rem;">
-                Marketplace preview coming soon. Click the button above to explore the full marketplace.
+            <div
+              id="marketplacePreview"
+              style="padding: 2rem; background: white; border-radius: 12px"
+            >
+              <p style="text-align: center; color: #666; padding: 3rem">
+                Marketplace preview coming soon. Click the button above to
+                explore the full marketplace.
               </p>
             </div>
           </div>
@@ -526,12 +556,15 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
         }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
     </style>
     <script src="features-script.js"></script>
   </body>
 </html>
-
