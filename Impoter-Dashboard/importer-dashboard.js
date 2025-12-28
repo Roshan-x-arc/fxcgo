@@ -4274,337 +4274,173 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
 
         const amount = document.getElementById('importerForwardContractAmount').value;
-        const settlementDate = document.getElementById('importerForwardContractSettlementDate').value;
-        const riskTolerance = document.getElementById('importerForwardContractRiskTolerance').value;
         const currencyPair = document.getElementById('importerForwardContractCurrencyPair').value;
 
-        // Format settlement date for display
-        const formattedDate = new Date(settlementDate).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
+        // Show loading state
+        resultsSection.innerHTML = '<div style="text-align: center; padding: 40px;"><div class="spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div><p>Fetching forecast data...</p></div>';
 
-        // Generate fake analysis results
-        const idealWindow = generateIdealWindow(riskTolerance);
-        const volatility = generateVolatility(currencyPair);
-        const recommendation = generateRecommendation(riskTolerance, volatility);
-
-        // Calculate preferred and least preferred lock-in dates
-        const settlementDateObj = new Date(settlementDate);
-        const lockInDates = calculateLockInDates(settlementDateObj, riskTolerance, volatility, currencyPair);
-
-        // Fetch current rate for results
-        let currentRate = null;
         try {
-            const [baseCurrency, quoteCurrency] = currencyPair.split('/');
-            if (baseCurrency === 'USD') {
-                currentRate = await fetchRateFromUSD(quoteCurrency);
-            } else if (quoteCurrency === 'USD') {
-                const inverseRate = await fetchRateFromUSD(baseCurrency);
-                currentRate = 1 / inverseRate;
-            } else {
-                const baseToUSD = await fetchRateFromUSD(baseCurrency);
-                const quoteToUSD = await fetchRateFromUSD(quoteCurrency);
-                currentRate = baseToUSD / quoteToUSD;
+            // Fetch forecast from backend API
+            const response = await fetch('http://127.0.0.1:8000/forecast');
+            if (!response.ok) {
+                throw new Error('Failed to fetch forecast data');
             }
+            const forecastData = await response.json();
+
+            // Fetch current rate for the currency pair
+            let currentRate = null;
+            try {
+                const [baseCurrency, quoteCurrency] = currencyPair.split('/');
+                if (baseCurrency === 'USD') {
+                    currentRate = await fetchRateFromUSD(quoteCurrency);
+                } else if (quoteCurrency === 'USD') {
+                    const inverseRate = await fetchRateFromUSD(baseCurrency);
+                    currentRate = 1 / inverseRate;
+                } else {
+                    const baseToUSD = await fetchRateFromUSD(baseCurrency);
+                    const quoteToUSD = await fetchRateFromUSD(quoteCurrency);
+                    currentRate = baseToUSD / quoteToUSD;
+                }
+            } catch (error) {
+                console.error('Error fetching rate for results:', error);
+            }
+
+            // Display results with forecast data
+            displayImporterResults({
+                amount: parseFloat(amount),
+                currencyPair,
+                currentRate,
+                forecastData
+            });
         } catch (error) {
-            console.error('Error fetching rate for results:', error);
+            console.error('Error fetching forecast:', error);
+            resultsSection.innerHTML = `
+                <div class="forward-contract-result-block" style="background: #fee2e2; border: 1px solid #fca5a5; padding: 20px; border-radius: 12px;">
+                    <h3 style="color: #991b1b; margin: 0 0 10px 0;">Error</h3>
+                    <p style="color: #7f1d1d; margin: 0;">Failed to fetch forecast data. Please make sure the backend server is running at http://127.0.0.1:8000</p>
+                </div>
+            `;
         }
-
-        // Calculate estimated rates for preferred and least preferred dates
-        let preferredDateRate = null;
-        let leastPreferredDateRate = null;
-        if (currentRate) {
-            const volNum = parseFloat(volatility);
-            preferredDateRate = estimateFutureRate(currentRate, volNum, lockInDates.preferredDaysBefore, 'preferred');
-            leastPreferredDateRate = estimateFutureRate(currentRate, volNum, lockInDates.leastPreferredDaysBefore, 'leastPreferred');
-        }
-
-        // Calculate risk premium and final amounts
-        const volNum = parseFloat(volatility);
-        const riskPremium = calculateRiskPremium(parseFloat(amount), riskTolerance, volNum);
-        
-        let preferredFinalAmount = null;
-        let leastPreferredFinalAmount = null;
-        
-        if (preferredDateRate && amount) {
-            preferredFinalAmount = calculateFinalAmount(parseFloat(amount), preferredDateRate, riskPremium, 'preferred');
-        }
-        
-        if (leastPreferredDateRate && amount) {
-            leastPreferredFinalAmount = calculateFinalAmount(parseFloat(amount), leastPreferredDateRate, riskPremium, 'leastPreferred');
-        }
-
-        // Display results
-        displayImporterResults({
-            amount,
-            settlementDate: formattedDate,
-            riskTolerance,
-            currencyPair,
-            idealWindow,
-            volatility,
-            recommendation,
-            currentRate,
-            preferredDate: lockInDates.preferred,
-            leastPreferredDate: lockInDates.leastPreferred,
-            preferredDateFormatted: lockInDates.preferredFormatted,
-            leastPreferredDateFormatted: lockInDates.leastPreferredFormatted,
-            preferredDateRate: preferredDateRate,
-            leastPreferredDateRate: leastPreferredDateRate,
-            riskPremium: riskPremium,
-            preferredFinalAmount: preferredFinalAmount,
-            leastPreferredFinalAmount: leastPreferredFinalAmount
-        });
     });
 
-    function generateIdealWindow(riskTolerance) {
-        const windows = {
-            low: '7-10 days before settlement',
-            medium: '10-14 days before settlement',
-            high: '14-21 days before settlement'
-        };
-        return windows[riskTolerance] || '10-14 days before settlement';
-    }
-
-    function generateVolatility(currencyPair) {
-        const volatilities = {
-            'USD/EUR': '2.3%',
-            'USD/GBP': '3.1%',
-            'USD/JPY': '4.2%',
-            'USD/INR': '1.8%',
-            'EUR/GBP': '2.7%',
-            'EUR/JPY': '3.9%',
-            'GBP/JPY': '4.5%'
-        };
-        return volatilities[currencyPair] || '2.5%';
-    }
-
-    function generateRecommendation(riskTolerance, volatility) {
-        const riskLevel = riskTolerance.charAt(0).toUpperCase() + riskTolerance.slice(1);
-        const volNum = parseFloat(volatility);
-        
-        if (riskTolerance === 'low' && volNum > 3) {
-            return 'Consider locking in earlier due to higher volatility and your low risk tolerance.';
-        } else if (riskTolerance === 'high' && volNum < 2.5) {
-            return 'You can afford to wait longer given lower volatility and your high risk tolerance.';
-        } else {
-            return 'Current market conditions align well with your risk profile.';
-        }
-    }
-
-    function calculateLockInDates(settlementDate, riskTolerance, volatility, currencyPair) {
-        // Get volatility as number
-        const volNum = parseFloat(volatility);
-        
-        // Calculate days before settlement based on risk tolerance and volatility
-        let preferredDaysBefore;
-        let leastPreferredDaysBefore;
-        
-        // Base calculation on risk tolerance
-        if (riskTolerance === 'low') {
-            // Low risk: lock in earlier (more days before)
-            preferredDaysBefore = volNum > 3 ? 12 : 10;
-            leastPreferredDaysBefore = 3; // Too close to settlement
-        } else if (riskTolerance === 'medium') {
-            // Medium risk: balanced approach
-            preferredDaysBefore = volNum > 3 ? 14 : 12;
-            leastPreferredDaysBefore = 2; // Too close to settlement
-        } else {
-            // High risk: can wait longer
-            preferredDaysBefore = volNum < 2.5 ? 18 : 15;
-            leastPreferredDaysBefore = 1; // Very close to settlement
-        }
-        
-        // Adjust based on volatility - higher volatility means earlier preferred date
-        if (volNum > 4) {
-            preferredDaysBefore += 2;
-        } else if (volNum < 2) {
-            preferredDaysBefore -= 1;
-        }
-        
-        // Calculate preferred date (subtract days from settlement)
-        const preferredDate = new Date(settlementDate);
-        preferredDate.setDate(preferredDate.getDate() - preferredDaysBefore);
-        
-        // Ensure preferred date is not in the past
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (preferredDate < today) {
-            // If preferred date is in past, set to tomorrow
-            preferredDate.setTime(today.getTime() + 24 * 60 * 60 * 1000);
-        }
-        
-        // Calculate least preferred date (very close to settlement)
-        const leastPreferredDate = new Date(settlementDate);
-        leastPreferredDate.setDate(leastPreferredDate.getDate() - leastPreferredDaysBefore);
-        
-        // Ensure least preferred date is not before today
-        if (leastPreferredDate < today) {
-            leastPreferredDate.setTime(today.getTime());
-        }
-        
-        // Format dates
-        const preferredFormatted = preferredDate.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'long'
-        });
-        
-        const leastPreferredFormatted = leastPreferredDate.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            weekday: 'long'
-        });
-        
-        return {
-            preferred: preferredDate,
-            leastPreferred: leastPreferredDate,
-            preferredFormatted: preferredFormatted,
-            leastPreferredFormatted: leastPreferredFormatted,
-            preferredDaysBefore: preferredDaysBefore,
-            leastPreferredDaysBefore: leastPreferredDaysBefore
-        };
-    }
-
-    function estimateFutureRate(currentRate, volatility, daysBefore, dateType) {
-        // Estimate future rate based on volatility and historical patterns
-        // This simulates what the rate might be on that date based on past trends
-        
-        // Convert volatility percentage to decimal
-        const volDecimal = volatility / 100;
-        
-        // Calculate expected price movement based on volatility
-        // Higher volatility = more potential movement
-        // Days before settlement affects uncertainty
-        const timeFactor = Math.sqrt(daysBefore / 30); // Square root of time for volatility scaling
-        const expectedMovement = volDecimal * timeFactor;
-        
-        // For preferred date: typically more favorable (slight downward movement for exporter benefit)
-        // For least preferred: higher uncertainty, potentially unfavorable
-        let rateAdjustment;
-        
-        if (dateType === 'preferred') {
-            // Preferred date: Based on historical analysis, rates tend to be more favorable
-            // Slight downward adjustment (0.3 to 0.7% better for exporter)
-            const favorableAdjustment = -0.005 * (1 + Math.random() * 0.4); // -0.5% to -0.7%
-            rateAdjustment = currentRate * favorableAdjustment;
-        } else {
-            // Least preferred date: Higher uncertainty, potentially unfavorable
-            // Could be 0.5% to 1.5% worse due to last-minute volatility
-            const unfavorableAdjustment = 0.008 * (1 + Math.random() * 0.5); // +0.8% to +1.2%
-            rateAdjustment = currentRate * unfavorableAdjustment;
-        }
-        
-        // Add some random variation based on volatility
-        const randomVariation = (Math.random() - 0.5) * currentRate * expectedMovement * 0.3;
-        
-        // Calculate estimated rate
-        const estimatedRate = currentRate + rateAdjustment + randomVariation;
-        
-        // Ensure rate is positive and reasonable
-        return Math.max(estimatedRate, currentRate * 0.95);
-    }
-
-    function calculateRiskPremium(amount, riskTolerance, volatility) {
-        // Calculate risk premium based on risk tolerance and volatility
-        // Higher risk tolerance and volatility = higher premium
-        
-        let basePremiumRate;
-        
-        // Base premium rate based on risk tolerance
-        if (riskTolerance === 'low') {
-            basePremiumRate = 0.0015; // 0.15% for low risk
-        } else if (riskTolerance === 'medium') {
-            basePremiumRate = 0.0025; // 0.25% for medium risk
-        } else {
-            basePremiumRate = 0.004; // 0.4% for high risk
-        }
-        
-        // Adjust based on volatility
-        const volatilityAdjustment = (volatility / 100) * 0.5; // Additional 0.5% per 1% volatility
-        const totalPremiumRate = basePremiumRate + volatilityAdjustment;
-        
-        // Calculate risk premium amount
-        const riskPremium = amount * totalPremiumRate;
-        
-        return {
-            rate: totalPremiumRate,
-            amount: riskPremium
-        };
-    }
-
-    function calculateFinalAmount(baseAmount, exchangeRate, riskPremium, dateType) {
-        // Calculate final amount = (base amount * exchange rate) + risk premium
-        
-        // For preferred date: slightly lower risk premium (better terms)
-        // For least preferred: higher risk premium (worse terms)
-        let premiumMultiplier = 1;
-        
-        if (dateType === 'preferred') {
-            premiumMultiplier = 0.9; // 10% discount on risk premium for preferred date
-        } else {
-            premiumMultiplier = 1.2; // 20% increase in risk premium for least preferred date
-        }
-        
-        const adjustedRiskPremium = riskPremium.amount * premiumMultiplier;
-        const finalAmount = (baseAmount * exchangeRate) + adjustedRiskPremium;
-        
-        return {
-            baseAmount: baseAmount,
-            exchangeRate: exchangeRate,
-            riskPremium: adjustedRiskPremium,
-            finalAmount: finalAmount,
-            premiumMultiplier: premiumMultiplier
-        };
-    }
-
     function displayImporterResults(data) {
+        const forecast = data.forecastData;
+        const bestTradeDate = new Date(forecast.best_trade_day.date);
+        const formattedBestDate = bestTradeDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'long'
+        });
+
         const resultHTML = `
             <div class="forward-contract-result-block">
-                <h2>Forward Contract Analysis</h2>
+                <h2>15-Day Forward Contract Forecast</h2>
 
                 <div class="forward-contract-result-content">
-                    <p>Recommended lock-in window: <strong>${data.idealWindow}</strong>.</p>
-                    <p>${data.recommendation}</p>
+                    <div style="margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 10px 0; color: #667eea;">Recommended Trade Date</h3>
+                        <p style="font-size: 1.1rem; margin: 5px 0;"><strong>Date:</strong> ${formattedBestDate}</p>
+                        <p style="font-size: 1.1rem; margin: 5px 0;"><strong>Equilibrium Price:</strong> ₹${forecast.best_trade_day.price.toFixed(2)}</p>
+                        <p style="margin: 10px 0 0 0; color: #6b7280; font-style: italic;">${forecast.best_trade_day.reason}</p>
+                    </div>
                 </div>
 
-                <div class="forward-contract-lockin-dates-section">
-                    <div class="forward-contract-date-card">
-                        <div class="forward-contract-date-label">Preferred Execution Date</div>
-                        <div class="forward-contract-date-value">${data.preferredDateFormatted}</div>
-                        <div class="forward-contract-date-info">Estimated Rate: ${data.preferredDateRate ? data.preferredDateRate.toFixed(4) : 'N/A'}</div>
-                        ${data.preferredFinalAmount ? `<div class="forward-contract-date-info">Final Amount: ${formatAmount(data.preferredFinalAmount.finalAmount)}</div>` : ''}
-                    </div>
-
-                    <div class="forward-contract-date-card">
-                        <div class="forward-contract-date-label">Least Preferred Date</div>
-                        <div class="forward-contract-date-value">${data.leastPreferredDateFormatted}</div>
-                        <div class="forward-contract-date-info">Estimated Rate: ${data.leastPreferredDateRate ? data.leastPreferredDateRate.toFixed(4) : 'N/A'}</div>
-                        ${data.leastPreferredFinalAmount ? `<div class="forward-contract-date-info">Final Amount: ${formatAmount(data.leastPreferredFinalAmount.finalAmount)}</div>` : ''}
-                    </div>
+                <div style="margin: 30px 0;">
+                    <canvas id="forecastChart" width="400" height="200"></canvas>
                 </div>
 
                 <div class="forward-contract-result-details">
                     <p><strong>Amount:</strong> ${formatAmount(data.amount)}</p>
-                    <p><strong>Settlement:</strong> ${data.settlementDate}</p>
-                    <p><strong>Pair:</strong> ${data.currencyPair}</p>
+                    <p><strong>Currency Pair:</strong> ${data.currencyPair}</p>
                     <p><strong>Current Rate:</strong> ${data.currentRate ? data.currentRate.toFixed(4) : 'N/A'}</p>
-                    <p><strong>Volatility:</strong> ${data.volatility}</p>
+                    <p><strong>Forecast Period:</strong> 15 days</p>
                 </div>
             </div>
         `;
 
         resultsSection.innerHTML = resultHTML;
 
+        // Create chart
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: forecast.dates.map(date => {
+                    const d = new Date(date);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }),
+                datasets: [
+                    {
+                        label: 'Predicted Price',
+                        data: forecast.predicted_prices,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Upper Risk Band',
+                        data: forecast.upper_risk,
+                        borderColor: 'rgba(34, 197, 94, 0.5)',
+                        backgroundColor: 'rgba(34, 197, 94, 0.05)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        fill: false
+                    },
+                    {
+                        label: 'Lower Risk Band',
+                        data: forecast.lower_risk,
+                        borderColor: 'rgba(239, 68, 68, 0.5)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '15-Day Price Forecast',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Price (₹)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    }
+                }
+            }
+        });
+
         const downloadBtn = document.createElement('button');
         downloadBtn.className = 'forward-contract-download-pdf-btn';
         downloadBtn.textContent = 'Download Contract Note PDF';
         downloadBtn.onclick = () => generateImporterPDF(data);
         resultsSection.querySelector('.forward-contract-result-block').appendChild(downloadBtn);
-        
+
         resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
@@ -4650,30 +4486,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         addRow("Currency Pair", data.currencyPair);
         addRow("Contract Amount", formatAmount(data.amount));
-        addRow("Settlement Date", data.settlementDate);
         addRow("Current Market Rate", data.currentRate?.toFixed(4) || "N/A");
-        addRow("Risk Tolerance", capitalize(data.riskTolerance));
-        addRow("Volatility (30-day)", data.volatility);
+        addRow("Forecast Period", "15 days");
 
         y += 5;
 
         doc.setFont("Helvetica", "bold");
         doc.setFontSize(12);
-        doc.text("Pricing Summary", margin, y);
+        doc.text("Forecast Summary", margin, y);
         y += 8;
         doc.setFontSize(10);
 
-        if (data.preferredFinalAmount) {
-            addRow("Preferred Execution Date", data.preferredDateFormatted);
-            addRow("Estimated Rate", data.preferredDateRate.toFixed(4));
-            addRow("Final Amount", formatAmount(data.preferredFinalAmount.finalAmount));
-            y += 4;
-        }
-
-        if (data.leastPreferredFinalAmount) {
-            addRow("Least Preferred Date", data.leastPreferredDateFormatted);
-            addRow("Estimated Rate", data.leastPreferredDateRate.toFixed(4));
-            addRow("Final Amount", formatAmount(data.leastPreferredFinalAmount.finalAmount));
+        if (data.forecastData && data.forecastData.best_trade_day) {
+            const bestDate = new Date(data.forecastData.best_trade_day.date);
+            const formattedBestDate = bestDate.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            addRow("Recommended Trade Date", formattedBestDate);
+            addRow("Equilibrium Price", `₹${data.forecastData.best_trade_day.price.toFixed(2)}`);
+            addRow("Forecast Period", "15 days");
             y += 4;
         }
 
@@ -4735,23 +4568,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const contractData = {
                 id: contractId,
                 amount: data.amount,
-                settlementDate: data.settlementDate,
                 currencyPair: data.currencyPair,
                 currentRate: data.currentRate,
-                riskTolerance: data.riskTolerance,
-                volatility: data.volatility,
-                idealWindow: data.idealWindow,
-                recommendation: data.recommendation,
-                preferredDate: data.preferredDateFormatted,
-                preferredDateRate: data.preferredDateRate,
-                preferredFinalAmount: data.preferredFinalAmount ? data.preferredFinalAmount.finalAmount : null,
-                leastPreferredDate: data.leastPreferredDateFormatted,
-                leastPreferredDateRate: data.leastPreferredDateRate,
-                leastPreferredFinalAmount: data.leastPreferredFinalAmount ? data.leastPreferredFinalAmount.finalAmount : null,
-                riskPremium: data.riskPremium ? {
-                    rate: data.riskPremium.rate,
-                    amount: data.riskPremium.amount
-                } : null,
+                forecastData: data.forecastData,
+                bestTradeDay: data.forecastData?.best_trade_day || null,
                 pdfBase64: pdfBase64Data,
                 pdfFileName: filename,
                 createdAt: new Date().toISOString(),
@@ -4770,9 +4590,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 successMsg.textContent = '✅ Contract saved successfully! You can view it in the Payments section.';
                 resultsSection.querySelector('.forward-contract-result-block').appendChild(successMsg);
                 
-                // Refresh payment section if it's currently visible
-                if (document.getElementById('paymentsSection') && 
-                    !document.getElementById('paymentsSection').hasAttribute('hidden')) {
+                // Refresh contracts section if needed
+                if (typeof loadImporterForwardContractsInPayments === 'function') {
                     loadImporterForwardContractsInPayments();
                 }
             } catch (error) {
@@ -4940,9 +4759,17 @@ document.addEventListener('DOMContentLoaded', function() {
             minute: '2-digit'
         });
         
-        const preferredAmount = contract.preferredFinalAmount ? formatAmount(contract.preferredFinalAmount) : 'N/A';
-        const settlementDate = contract.settlementDate || 'N/A';
         const currentRate = contract.currentRate ? contract.currentRate.toFixed(4) : 'N/A';
+        const bestTradeDate = contract.bestTradeDay && contract.bestTradeDay.date 
+            ? new Date(contract.bestTradeDay.date).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            })
+            : 'N/A';
+        const bestTradePrice = contract.bestTradeDay && contract.bestTradeDay.price
+            ? `₹${contract.bestTradeDay.price.toFixed(2)}`
+            : 'N/A';
         
         card.innerHTML = `
             <div class="forward-contract-card-header">
@@ -4958,10 +4785,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span class="forward-contract-detail-value">${formatAmount(contract.amount)}</span>
                 </div>
                 <div class="forward-contract-detail-item">
-                    <span class="forward-contract-detail-label">Settlement Date</span>
-                    <span class="forward-contract-detail-value">${settlementDate}</span>
-                </div>
-                <div class="forward-contract-detail-item">
                     <span class="forward-contract-detail-label">Currency Pair</span>
                     <span class="forward-contract-detail-value">${contract.currencyPair}</span>
                 </div>
@@ -4970,12 +4793,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span class="forward-contract-detail-value">${currentRate}</span>
                 </div>
                 <div class="forward-contract-detail-item">
-                    <span class="forward-contract-detail-label">Preferred Final Amount</span>
-                    <span class="forward-contract-detail-value">${preferredAmount}</span>
+                    <span class="forward-contract-detail-label">Best Trade Date</span>
+                    <span class="forward-contract-detail-value">${bestTradeDate}</span>
                 </div>
                 <div class="forward-contract-detail-item">
-                    <span class="forward-contract-detail-label">Risk Tolerance</span>
-                    <span class="forward-contract-detail-value">${contract.riskTolerance ? contract.riskTolerance.charAt(0).toUpperCase() + contract.riskTolerance.slice(1) : 'N/A'}</span>
+                    <span class="forward-contract-detail-label">Best Trade Price</span>
+                    <span class="forward-contract-detail-value">${bestTradePrice}</span>
                 </div>
             </div>
             <div class="forward-contract-card-actions">
@@ -5078,24 +4901,30 @@ document.addEventListener('DOMContentLoaded', function() {
             const contract = snapshot.val();
             
             // Create a modal or alert with contract details
+            const bestTradeDate = contract.bestTradeDay && contract.bestTradeDay.date
+                ? new Date(contract.bestTradeDay.date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                })
+                : 'N/A';
+            const bestTradePrice = contract.bestTradeDay && contract.bestTradeDay.price
+                ? `₹${contract.bestTradeDay.price.toFixed(2)}`
+                : 'N/A';
+            const bestTradeReason = contract.bestTradeDay && contract.bestTradeDay.reason
+                ? contract.bestTradeDay.reason
+                : 'N/A';
+            
             const details = `
 Forward Contract Details
 
 Amount: ${formatAmount(contract.amount)}
-Settlement Date: ${contract.settlementDate}
 Currency Pair: ${contract.currencyPair}
 Current Rate: ${contract.currentRate ? contract.currentRate.toFixed(4) : 'N/A'}
-Risk Tolerance: ${contract.riskTolerance ? contract.riskTolerance.charAt(0).toUpperCase() + contract.riskTolerance.slice(1) : 'N/A'}
-Volatility: ${contract.volatility || 'N/A'}
-Ideal Window: ${contract.idealWindow || 'N/A'}
-Preferred Date: ${contract.preferredDate || 'N/A'}
-Preferred Date Rate: ${contract.preferredDateRate ? contract.preferredDateRate.toFixed(4) : 'N/A'}
-Preferred Final Amount: ${contract.preferredFinalAmount ? formatAmount(contract.preferredFinalAmount) : 'N/A'}
-Least Preferred Date: ${contract.leastPreferredDate || 'N/A'}
-Least Preferred Date Rate: ${contract.leastPreferredDateRate ? contract.leastPreferredDateRate.toFixed(4) : 'N/A'}
-Least Preferred Final Amount: ${contract.leastPreferredFinalAmount ? formatAmount(contract.leastPreferredFinalAmount) : 'N/A'}
-Risk Premium Rate: ${contract.riskPremium && contract.riskPremium.rate ? (contract.riskPremium.rate * 100).toFixed(2) + '%' : 'N/A'}
-Recommendation: ${contract.recommendation || 'N/A'}
+Best Trade Date: ${bestTradeDate}
+Best Trade Price: ${bestTradePrice}
+Reason: ${bestTradeReason}
+Forecast Period: 15 days
 Created: ${new Date(contract.createdAt).toLocaleString()}
             `;
             

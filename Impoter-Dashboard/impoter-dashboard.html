@@ -345,8 +345,10 @@
                         <header class="forward-contract-hero">
                             <div class="forward-contract-hero-icon">💱</div>
                             <h2>Forward Contract Note Generator</h2>
-                            <p class="forward-contract-subheadline">Analyze FX trends, volatility, and risk tolerance to
-                                determine the optimal time to lock a forward contract.</p>
+                            <p class="forward-contract-subheadline">
+                                Analyze FX trends and volatility using AI-powered forecasting to determine
+                                the optimal time to lock a forward contract.
+                            </p>
                         </header>
 
                         <main class="forward-contract-main-content">
@@ -361,33 +363,13 @@
                                                 <span class="forward-contract-label-icon">💰</span>
                                                 Amount
                                             </label>
-                                            <input type="number" id="importerForwardContractAmount" name="amount"
-                                                placeholder="Enter amount" required>
-                                        </div>
-
-                                        <div class="forward-contract-form-group">
-                                            <label for="importerForwardContractSettlementDate">
-                                                <span class="forward-contract-label-icon">📅</span>
-                                                Settlement Date
-                                            </label>
-                                            <input type="date" id="importerForwardContractSettlementDate"
-                                                name="settlementDate" required>
-                                        </div>
-                                    </div>
-
-                                    <div class="forward-contract-form-row">
-                                        <div class="forward-contract-form-group">
-                                            <label for="importerForwardContractRiskTolerance">
-                                                <span class="forward-contract-label-icon">⚡</span>
-                                                Risk Tolerance
-                                            </label>
-                                            <select id="importerForwardContractRiskTolerance" name="riskTolerance"
-                                                required>
-                                                <option value="">Select risk tolerance</option>
-                                                <option value="low">Low</option>
-                                                <option value="medium">Medium</option>
-                                                <option value="high">High</option>
-                                            </select>
+                                            <input
+                                                type="number"
+                                                id="importerForwardContractAmount"
+                                                name="amount"
+                                                placeholder="Enter amount"
+                                                required
+                                            />
                                         </div>
 
                                         <div class="forward-contract-form-group">
@@ -395,8 +377,11 @@
                                                 <span class="forward-contract-label-icon">🌍</span>
                                                 Currency Pair
                                             </label>
-                                            <select id="importerForwardContractCurrencyPair" name="currencyPair"
-                                                required>
+                                            <select
+                                                id="importerForwardContractCurrencyPair"
+                                                name="currencyPair"
+                                                required
+                                            >
                                                 <option value="">Select currency pair</option>
                                                 <option value="USD/EUR">USD/EUR</option>
                                                 <option value="USD/GBP">USD/GBP</option>
@@ -406,8 +391,10 @@
                                                 <option value="EUR/JPY">EUR/JPY</option>
                                                 <option value="GBP/JPY">GBP/JPY</option>
                                             </select>
-                                            <div id="importerForwardContractCurrencyPrice"
-                                                class="forward-contract-currency-price"></div>
+                                            <div
+                                                id="importerForwardContractCurrencyPrice"
+                                                class="forward-contract-currency-price"
+                                            ></div>
                                         </div>
                                     </div>
 
@@ -418,7 +405,10 @@
                                 </form>
                             </div>
 
-                            <div id="importerForwardContractResults" class="forward-contract-results-section"></div>
+                            <div
+                                id="importerForwardContractResults"
+                                class="forward-contract-results-section"
+                            ></div>
                         </main>
                     </div>
                 </section>
@@ -1407,6 +1397,7 @@
     <!-- Razorpay Script -->
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="importer-dashboard.js"></script>
 </body>
 
