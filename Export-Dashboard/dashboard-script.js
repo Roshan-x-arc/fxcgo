@@ -8041,6 +8041,71 @@ document.addEventListener("DOMContentLoaded", function () {
     resultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  /**
+   * Convert image URL to base64 for PDF embedding
+   * Handles CORS and file protocol issues
+   */
+  function imageToBase64(url) {
+    return new Promise((resolve, reject) => {
+      // If it's already a data URL, return it
+      if (url.startsWith('data:image/')) {
+        resolve(url);
+        return;
+      }
+
+      const img = new Image();
+      
+      // Try without CORS first (for same-origin images)
+      img.crossOrigin = '';
+      
+      img.onload = function() {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const base64 = canvas.toDataURL('image/png');
+          resolve(base64);
+        } catch (error) {
+          // If canvas fails, try with CORS
+          const img2 = new Image();
+          img2.crossOrigin = 'Anonymous';
+          img2.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img2.width;
+            canvas.height = img2.height;
+            ctx.drawImage(img2, 0, 0);
+            const base64 = canvas.toDataURL('image/png');
+            resolve(base64);
+          };
+          img2.onerror = () => reject(new Error('Image load failed'));
+          img2.src = url;
+        }
+      };
+      
+      img.onerror = () => {
+        // Retry with CORS
+        const img2 = new Image();
+        img2.crossOrigin = 'Anonymous';
+        img2.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img2.width;
+          canvas.height = img2.height;
+          ctx.drawImage(img2, 0, 0);
+          const base64 = canvas.toDataURL('image/png');
+          resolve(base64);
+        };
+        img2.onerror = () => reject(new Error('Image load failed'));
+        img2.src = url;
+      };
+      
+      img.src = url;
+    });
+  }
+
   async function generatePDF(data) {
     if (typeof window.jspdf === "undefined") {
       alert("PDF library not loaded. Please refresh the page.");
@@ -8049,31 +8114,84 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
-    let y = 20;
+    let y = 25;
 
+    // Load logo image
+    let logoBase64 = null;
+    const logoPaths = [
+      '../assets/logo.png',
+      'assets/logo.png',
+      './assets/logo.png'
+    ];
+    
+    for (const logoPath of logoPaths) {
+      try {
+        logoBase64 = await imageToBase64(logoPath);
+        if (logoBase64) break;
+      } catch (error) {
+        continue;
+      }
+    }
+
+    // Add logo at top center if available
+    if (logoBase64) {
+      try {
+        const logoWidth = 40;
+        const logoHeight = 40;
+        const logoX = (pageWidth - logoWidth) / 2;
+        doc.addImage(logoBase64, 'PNG', logoX, 10, logoWidth, logoHeight);
+        y = 60; // Start content below logo
+      } catch (error) {
+        console.warn('Could not add logo to PDF:', error);
+        y = 20;
+      }
+    }
+
+    // Header with background color
+    doc.setFillColor(102, 126, 234); // Purple/blue color
+    doc.rect(0, y - 5, pageWidth, 25, 'F');
+    
+    // Title in header
+    doc.setTextColor(255, 255, 255);
     doc.setFont("Helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("FORWARD CONTRACT NOTE", pageWidth / 2, y, { align: "center" });
-    y += 10;
+    doc.setFontSize(18);
+    doc.text("FORWARD CONTRACT NOTE", pageWidth / 2, y + 8, { align: "center" });
+    
+    doc.setFontSize(9);
+    doc.setFont("Helvetica", "normal");
+    doc.text("FXcgo Pvt. Ltd.", pageWidth / 2, y + 14, { align: "center" });
+
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    y += 30;
 
     doc.setLineWidth(0.2);
+    doc.setDrawColor(200, 200, 200);
     doc.line(margin, y, pageWidth - margin, y);
     y += 10;
 
-    doc.setFontSize(12);
-    doc.text("Contract Details", margin, y);
-    y += 8;
+    // Contract Details Section with styled box
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, y - 5, pageWidth - 2 * margin, 35, 'F');
+    
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(102, 126, 234);
+    doc.text("Contract Details", margin + 5, y);
+    y += 12;
 
     doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
 
-    function addRow(label, value) {
+    function addRow(label, value, valueOffset = 60) {
       doc.setFont("Helvetica", "bold");
-      doc.text(label + ":", margin, y);
+      doc.text(label + ":", margin + 10, y);
       doc.setFont("Helvetica", "normal");
-      doc.text(String(value), margin + 60, y);
+      const valueText = String(value);
+      doc.text(valueText, margin + valueOffset, y);
       y += 6;
     }
 
@@ -8081,18 +8199,25 @@ document.addEventListener("DOMContentLoaded", function () {
       return x.charAt(0).toUpperCase() + x.slice(1);
     }
 
-    addRow("Currency Pair", data.currencyPair);
-    addRow("Contract Amount", formatAmount(data.amount));
-    addRow("Current Market Rate", data.currentRate?.toFixed(4) || "N/A");
-    addRow("Forecast Period", "15 days");
+    addRow("Currency Pair", data.currencyPair, 65);
+    addRow("Contract Amount", formatAmount(data.amount), 70);
+    addRow("Current Market Rate", data.currentRate?.toFixed(4) || "N/A", 75);
+    addRow("Forecast Period", "15 days", 75);
 
-    y += 5;
+    y += 12;
 
+    // Forecast Summary Section
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, y - 5, pageWidth - 2 * margin, 50, 'F');
+    
     doc.setFont("Helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Forecast Summary", margin, y);
-    y += 8;
+    doc.setFontSize(14);
+    doc.setTextColor(102, 126, 234);
+    doc.text("Forecast Summary", margin + 5, y);
+    y += 12;
+    
     doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
 
     if (data.forecastData && data.forecastData.best_trade_day) {
       const bestDate = new Date(data.forecastData.best_trade_day.date);
@@ -8100,24 +8225,38 @@ document.addEventListener("DOMContentLoaded", function () {
         year: "numeric",
         month: "long",
         day: "numeric",
+        weekday: "long"
       });
-      addRow("Recommended Trade Date", formattedBestDate);
+      
+      // Highlight recommended date
+      doc.setFillColor(220, 252, 231); // Light green
+      doc.rect(margin + 8, y - 4, pageWidth - 2 * margin - 16, 18, 'F');
+      
+      addRow("Recommended Trade Date", formattedBestDate, 90);
       addRow(
         "Equilibrium Price",
-        `₹${data.forecastData.best_trade_day.price.toFixed(2)}`
+        `₹${data.forecastData.best_trade_day.price.toFixed(2)}`,
+        85
       );
-      addRow("Forecast Period", "15 days");
-      y += 4;
+      addRow("Forecast Period", "15 days", 75);
+      y += 2;
     }
 
-    y += 5;
+    y += 10;
 
+    // Terms & Disclaimers Section
+    doc.setFillColor(248, 249, 250);
+    doc.rect(margin, y - 5, pageWidth - 2 * margin, 60, 'F');
+    
     doc.setFont("Helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text("Terms & Disclaimers", margin, y);
-    y += 8;
+    doc.setFontSize(14);
+    doc.setTextColor(102, 126, 234);
+    doc.text("Terms & Disclaimers", margin + 5, y);
+    y += 10;
 
     doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.setFont("Helvetica", "normal");
 
     const terms = [
       "1. All exchange rates stated herein are indicative and subject to market movements.",
@@ -8128,24 +8267,88 @@ document.addEventListener("DOMContentLoaded", function () {
     ];
 
     terms.forEach((t) => {
-      const lines = doc.splitTextToSize(t, pageWidth - margin * 2);
-      doc.text(lines, margin, y);
-      y += lines.length * 5;
+      const lines = doc.splitTextToSize(t, pageWidth - 2 * margin - 20);
+      doc.text(lines, margin + 10, y);
+      y += lines.length * 4.5;
     });
 
     y += 15;
 
+    // Authorized Signatory Section
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 10;
+
+    // Load signature/seal image if available
+    let signatureBase64 = null;
+    const signaturePaths = [
+      '../assets/company-seal.png',
+      '../assets/seal.png',
+      '../assets/signature.png',
+      'assets/company-seal.png',
+      'assets/seal.png',
+      'assets/signature.png'
+    ];
+    
+    for (const path of signaturePaths) {
+      try {
+        signatureBase64 = await imageToBase64(path);
+        if (signatureBase64) break;
+      } catch (e) {
+        continue;
+      }
+    }
+
+    // Create two columns: signature on left, details on right
+    const sigX = margin + 10;
+    const detailsX = pageWidth / 2;
+
+    // Add signature/seal image if available
+    if (signatureBase64) {
+      try {
+        const sigWidth = 50;
+        const sigHeight = 50;
+        doc.addImage(signatureBase64, 'PNG', sigX, y, sigWidth, sigHeight);
+        y += sigHeight + 8;
+      } catch (error) {
+        console.warn('Could not add signature to PDF:', error);
+        y += 10;
+      }
+    } else {
+      // Fallback: signature line
+      doc.setLineWidth(1);
+      doc.line(sigX, y + 20, sigX + 60, y + 20);
+      y += 28;
+    }
+
+    // Signatory details on the right
+    const detailY = y - (signatureBase64 ? 58 : 30);
     doc.setFont("Helvetica", "bold");
     doc.setFontSize(12);
-    doc.text("Authorized Signatory", margin, y);
-    y += 20;
-
+    doc.setTextColor(0, 0, 0);
+    doc.text("Authorized Signatory", detailsX, detailY);
+    
     doc.setFont("Helvetica", "normal");
-    doc.text("______________________________", margin, y);
-    y += 6;
-    doc.text("Treasury Operations", margin, y);
-    y += 6;
-    doc.text("Issued: " + new Date().toLocaleDateString("en-US"), margin, y);
+    doc.setFontSize(10);
+    doc.text("Pritish Kumar", detailsX, detailY + 6);
+    doc.text("Treasury Operations", detailsX, detailY + 12);
+    doc.text("FXcgo Pvt. Ltd.", detailsX, detailY + 18);
+    
+    // Date at bottom
+    const issuedDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric"
+    });
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Issued: ${issuedDate}`, pageWidth / 2, pageHeight - 20, { align: "center" });
+
+    // Footer line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
 
     const filename = `Forward_Contract_${data.currencyPair.replace(
       "/",
