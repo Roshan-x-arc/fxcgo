@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>15-Day INR Forecast</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<h2>15-Day INR Forecast</h2>
+<canvas id="chart" width="800" height="400"></canvas>
+
+<p id="bestTrade"></p>
+
+<script>
+console.log("JS Loaded");
+
+fetch("http://127.0.0.1:8000/forecast")
+  .then(response => response.json())
+  .then(data => {
+    console.log("API Data:", data);
+
+    const ctx = document.getElementById("chart").getContext("2d");
+
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: data.dates,
+        datasets: [
+          {
+            label: "Predicted Price",
+            data: data.predicted_prices,
+            borderColor: "blue",
+            borderWidth: 2,
+            fill: false
+          },
+          {
+            label: "Upper Risk",
+            data: data.upper_risk,
+            borderColor: "rgba(0,0,255,0.2)",
+            fill: false
+          },
+          {
+            label: "Lower Risk",
+            data: data.lower_risk,
+            borderColor: "rgba(0,0,255,0.2)",
+            fill: false
+          }
+        ]
+      }
+    });
+
+    document.getElementById("bestTrade").innerHTML =
+      `<b>Best Trade Date:</b> ${data.best_trade_day.date}<br>
+       <b>Equilibrium Price:</b> ₹${data.best_trade_day.price}`;
+  })
+  .catch(error => {
+    console.error("Fetch error:", error);
+  });
+</script>
+
+</body>
+</html>
